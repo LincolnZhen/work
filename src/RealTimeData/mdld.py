@@ -88,7 +88,7 @@ class PeriodAPP():
         # self.a1d = AverageLine(13)
         self.conn_r = redis.Redis(host="168.36.1.115", port=6379, password="", charset='gb18030', errors='replace',
                            decode_responses=True)
-        self.conn_w = redis.Redis(host="192.168.40.134", port = 6379, password="", charset='gb18030',errors="replace",
+        self.conn_w = redis.Redis(host="168.36.1.116", port = 6379, password="", charset='gb18030',errors="replace",
                              decode_responses=True)
         self.conn_r2 = redis.Redis(host="168.36.1.170", port=6379, password="", charset='gb18030', errors='replace',
                            decode_responses=True)
@@ -273,8 +273,8 @@ class PeriodAPP():
         for pxname, (icode_c, icode_p)in self.config.config_optlist.items():
             #> '1909M02750': ['10001709', '10001710']
             # print(item[0][:4])
-            conn_r2.hmget("MD:01" + icode_c,'Latest','SP1','BP1')  #> "MD:0110001709"
-            conn_r2.hmget("MD:01" + icode_p,'Latest','SP1','BP1')
+            conn_r2.hmget("MD:01" + icode_c,'Latest','SP1','BP1','PreSettle')  #> "MD:0110001709"
+            conn_r2.hmget("MD:01" + icode_p,'Latest','SP1','BP1','PreSettle')
         r1_result = conn_r.execute()
         r2_result = conn_r2.execute()
         # print(r1_result, r2_result)
@@ -356,7 +356,7 @@ class PeriodAPP():
             # self.a2h.squeue[key].append(d)
             # self.a4h.squeue[key].append(d)
             # print(d)
-            conn_w.hmset("MDLD:" + str(cur_ts) + ":JZ:" + key,d)
+            conn_w.hmset("MDLD:" + str(cur_ts) + ":JZ:" + key,d2)
             if key == "S510050":
                 pe = int(d['LATEST'])
                 pe_510050_SP1 = int(d['SP1'])
@@ -386,14 +386,19 @@ class PeriodAPP():
             # print(item[0][:4])
             date_list.add(pxname[:4])  #> “1909”
             tem1 = dict()
-            tem1['Latest'], tem1['SP1'], tem1['BP1'] = r2_result[r2_index]  #> "MD:0110001709"
+            tem1['Latest'], tem1['SP1'], tem1['BP1'], tem1['PreSettle'] = r2_result[r2_index]  #> "MD:0110001709"
             r2_index = r2_index + 1
             tem2 = dict()
-            tem2['Latest'], tem2['SP1'], tem2['BP1'] = r2_result[r2_index]
+            tem2['Latest'], tem2['SP1'], tem2['BP1'], tem2['PreSettle'] = r2_result[r2_index]
             r2_index = r2_index + 1
             # print(tem1, tem2)
-            if tem1['Latest'] == None or tem1['BP1'] == None or tem1['SP1'] == None or tem2['Latest'] == None or tem2['SP1'] == None or tem2['BP1'] == None:
+            if tem1['Latest'] == None or tem1['BP1'] == None or tem1['SP1'] == None or tem2['Latest'] == None \
+                    or tem2['SP1'] == None or tem2['BP1'] == None or tem1['PreSettle'] == None or tem2['PreSettle'] == None:
                 continue
+            if tem1['Latest'] == 0:
+                tem1['Latest'] = tem1['PreSettle']
+            if tem2['Latest'] == 0:
+                tem2['Latest'] = tem2['PreSettle']
             # print(tem1)
             price_dict= dict()
             price_dict['Name'] = pxname
@@ -477,20 +482,20 @@ class PeriodAPP():
                 d["B"] = int(f_d_list[key]['BP1'])//1000 - pe_510050_SP1
                 d["S"] = int(f_d_list[key]['SP1'])//1000 - pe_510050_BP1
                 d["L"] = int(f_d_list[key]['LATEST'])//1000 - pe
-                d["C"] = int(f_d_list[key]['BP1'])//1000 - jz_510050_SP1
-                d["R"] = int(f_d_list[key]['SP1'])//1000 - jz_510050_BP1
+                d["C"] = int(f_d_list[key]['BP1'])//1000 - jz_510050_SP1 * 10000
+                d["R"] = int(f_d_list[key]['SP1'])//1000 - jz_510050_BP1 * 10000
             elif key.startswith("IF"):
                 d["B"] = int(f_d_list[key]['BP1'])//1000 - pe_510300_BP1
                 d["S"] = int(f_d_list[key]['SP1'])//1000 - pe_510300_BP1
                 d["L"] = int(f_d_list[key]['LATEST'])//1000 - pe300
-                d["C"] = int(f_d_list[key]['BP1'])//1000 - jz_510300_SP1
-                d["R"] = int(f_d_list[key]['SP1'])//1000 - jz_510300_BP1
+                d["C"] = int(f_d_list[key]['BP1'])//1000 - jz_510300_SP1 * 10000
+                d["R"] = int(f_d_list[key]['SP1'])//1000 - jz_510300_BP1 * 10000
             elif key.startswith("IC"):
                 d["B"] = int(f_d_list[key]['BP1'])//1000 - pe_510500_BP1
                 d["S"] = int(f_d_list[key]['SP1'])//1000 - pe_510500_BP1
                 d["L"] = int(f_d_list[key]['LATEST'])//1000 - pe500
-                d["C"] = int(f_d_list[key]['BP1'])//1000 - jz_510500_SP1
-                d["R"] = int(f_d_list[key]['SP1'])//1000 - jz_510500_BP1
+                d["C"] = int(f_d_list[key]['BP1'])//1000 - jz_510500_SP1 * 10000
+                d["R"] = int(f_d_list[key]['SP1'])//1000 - jz_510500_BP1 * 10000
             conn_w.hmset("MDLD:" + str(cur_ts) + ":A13:" + key, d)
 
         # for i in range(len(op_c_p_price)-1):
@@ -605,7 +610,7 @@ class PeriodAPP():
 
 def main():
     # print(type(time.localtime().tm_mon),time.localtime().tm_year,time.localtime().tm_mday)
-    t = PeriodAPP(["08:30:00","11:30:00"],["13:00:00","16:00:00"])
+    t = PeriodAPP(["09:30:00","11:30:00"],["13:00:00","15:00:00"])
     t.start()
     # time.sleep(10)
     # t.join()

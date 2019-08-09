@@ -88,9 +88,9 @@ class PeriodAPP():
         # self.a1d = AverageLine(13)
         self.conn_r = redis.Redis(host="168.36.1.115", port=6379, password="", charset='gb18030', errors='replace',
                            decode_responses=True)
-        self.conn_w = redis.Redis(host="192.168.40.134", port = 6379, password="", charset='gb18030',errors="replace",
+        self.conn_w = redis.Redis(host="168.36.1.116", port = 6379, password="", charset='gb18030',errors="replace",
                              decode_responses=True)
-        self.conn_r2 = redis.Redis(host="168.36.1.170", port=6379, password="", charset='gb18030', errors='replace',
+        self.conn_r2 = redis.Redis(host="192.168.40.134", port=6379, password="", charset='gb18030', errors='replace',
                            decode_responses=True)
 
     def timeit(func):
@@ -356,7 +356,7 @@ class PeriodAPP():
             # self.a2h.squeue[key].append(d)
             # self.a4h.squeue[key].append(d)
             # print(d)
-            conn_w.hmset("MDLD:" + str(cur_ts) + ":JZ:" + key,d)
+            conn_w.hmset("MDLD:" + str(cur_ts) + ":JZ:" + key,d2)
             if key == "S510050":
                 pe = int(d['LATEST'])
                 pe_510050_SP1 = int(d['SP1'])
@@ -477,20 +477,20 @@ class PeriodAPP():
                 d["B"] = int(f_d_list[key]['BP1'])//1000 - pe_510050_SP1
                 d["S"] = int(f_d_list[key]['SP1'])//1000 - pe_510050_BP1
                 d["L"] = int(f_d_list[key]['LATEST'])//1000 - pe
-                d["C"] = int(f_d_list[key]['BP1'])//1000 - jz_510050_SP1
-                d["R"] = int(f_d_list[key]['SP1'])//1000 - jz_510050_BP1
+                d["C"] = int(f_d_list[key]['BP1'])//1000 - jz_510050_SP1 * 10000
+                d["R"] = int(f_d_list[key]['SP1'])//1000 - jz_510050_BP1 * 10000
             elif key.startswith("IF"):
                 d["B"] = int(f_d_list[key]['BP1'])//1000 - pe_510300_BP1
                 d["S"] = int(f_d_list[key]['SP1'])//1000 - pe_510300_BP1
                 d["L"] = int(f_d_list[key]['LATEST'])//1000 - pe300
-                d["C"] = int(f_d_list[key]['BP1'])//1000 - jz_510300_SP1
-                d["R"] = int(f_d_list[key]['SP1'])//1000 - jz_510300_BP1
+                d["C"] = int(f_d_list[key]['BP1'])//1000 - jz_510300_SP1 * 10000
+                d["R"] = int(f_d_list[key]['SP1'])//1000 - jz_510300_BP1 * 10000
             elif key.startswith("IC"):
                 d["B"] = int(f_d_list[key]['BP1'])//1000 - pe_510500_BP1
                 d["S"] = int(f_d_list[key]['SP1'])//1000 - pe_510500_BP1
                 d["L"] = int(f_d_list[key]['LATEST'])//1000 - pe500
-                d["C"] = int(f_d_list[key]['BP1'])//1000 - jz_510500_SP1
-                d["R"] = int(f_d_list[key]['SP1'])//1000 - jz_510500_BP1
+                d["C"] = int(f_d_list[key]['BP1'])//1000 - jz_510500_SP1 * 10000
+                d["R"] = int(f_d_list[key]['SP1'])//1000 - jz_510500_BP1 * 10000
             conn_w.hmset("MDLD:" + str(cur_ts) + ":A13:" + key, d)
 
         # for i in range(len(op_c_p_price)-1):
@@ -605,7 +605,7 @@ class PeriodAPP():
 
 def main():
     # print(type(time.localtime().tm_mon),time.localtime().tm_year,time.localtime().tm_mday)
-    t = PeriodAPP(["08:30:00","11:30:00"],["13:00:00","16:00:00"])
+    t = PeriodAPP(["09:30:00","11:30:00"],["13:02:00","16:00:00"])
     t.start()
     # time.sleep(10)
     # t.join()

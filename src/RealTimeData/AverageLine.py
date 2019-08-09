@@ -69,15 +69,30 @@ class AverageLine:
         self.vp00queue = {}
         self.vp05queue = {}
         self.vpn5queue = {}
-
+        self.a5queue = {}
+        self.yester_fqueue = {} # type: dict[str, deque]
+        self.yester_squeue = {}
+        self.yester_opcqueue = {}
+        self.yester_oppqueue = {}
+        self.yester_vc00queue = {}
+        self.yester_vc05queue = {}
+        self.yester_vcn5queue = {}
+        self.yester_vp00queue = {}
+        self.yester_vp05queue = {}
+        self.yester_vpn5queue = {}
+        self.yester_a5queue = {}
         for key in self.config.config_flist.values():
             self.fqueue[key] = deque(maxlen=self.interval_list[self.interval])
+            self.yester_fqueue[key] = {}
         for key in self.config.config_slist:
             self.squeue[key] = deque(maxlen=self.interval_list[self.interval])
+            self.yester_squeue[key] = {}
         for key in self.config.config_optlist.items():
             self.opcqueue[key[0]] = deque(maxlen=self.interval_list[self.interval])
+            self.yester_opcqueue[key[0]] = {}
         for key in self.config.config_optlist.items():
             self.oppqueue[key[0]] = deque(maxlen=self.interval_list[self.interval])
+            self.yester_oppqueue[key[0]] = {}
         for key in self.config.config_optlist.keys():
             self.vc00queue[key[:4]] = deque(maxlen=self.interval_list[self.interval])
             self.vp00queue[key[:4]] = deque(maxlen=self.interval_list[self.interval])
@@ -85,13 +100,38 @@ class AverageLine:
             self.vpn5queue[key[:4]] = deque(maxlen=self.interval_list[self.interval])
             self.vc05queue[key[:4]] = deque(maxlen=self.interval_list[self.interval])
             self.vp05queue[key[:4]] = deque(maxlen=self.interval_list[self.interval])
+            self.yester_vc00queue[key[:4]] = {}
+            self.yester_vp00queue[key[:4]] = {}
+            self.yester_vcn5queue[key[:4]] = {}
+            self.yester_vpn5queue[key[:4]] = {}
+            self.yester_vc05queue[key[:4]] = {}
+            self.yester_vp05queue[key[:4]] = {}
+        for pxname, (icode_c, icode_p) in self.config.config_optlist.items():
+            self.a5queue[pxname] = deque(maxlen=self.interval_list[self.interval])
+            self.yester_a5queue[pxname] = {}
+
         self.directCompute = False
+        self.a5initialYest = False
+        self.vp05initialYest = False
+        self.vc05initialYest = False
+        self.vpn5initialYest = False
+        self.vcn5initialYest = False
+        self.vp00initialYest = False
+        self.vc00initialYest = False
+        self.oppinitialYest = False
+        self.opcinitialYest = False
+        self.sinitialYest = False
+        self.finitialYest = False
+    # def initialqueue(self):
+    #     i = 57600 - self.interval_list[self.interval]
+    #     while i < 57600:
+
 
     def timeit(func):
-        def test(self,num_list,interval):
-            start = time.time()
-            func(self,num_list,interval)
-            end = time.time()
+        def test(self,key:int,conn_w):
+            start = time.perf_counter()
+            func(self,key,conn_w)
+            end = time.perf_counter()
             print("compute average time used: ", end - start)
         return test
 
@@ -204,6 +244,8 @@ class AverageLine:
             return self.opcqueue[keyname]
         elif keyword.startswith(':OP:P'):
             return self.oppqueue[keyname]
+        elif keyword.startswith(":A5:"):
+            return  self.a5queue[keyname]
         elif keyword.startswith(':V:C'):
             if keyword[-6:] == 'MV0000':
                 # print("yes")
@@ -225,124 +267,367 @@ class AverageLine:
 
     def operate(self, cur_ts:int, keyword:str, interval:int, conn_w, keyname:str):
         prefix = "MDLD:"
-        l = self.fillQueue(cur_ts, keyword, self.interval, keyname)
+        q = self.fillQueue(cur_ts, keyword, self.interval, keyname)
         # print(prefix+str(cur_ts-1)+keyword,self.averageNames[self.interval] + 'LATEST',prefix+ str(cur_ts-self.interval_list[self.interval])+keyword)
-        if not (str(self.interval_list[self.interval])+'LATEST' in l[len(l) - 1].keys()) or not (str(self.interval_list[self.interval])+'BP1' in l[len(l) - 1].keys()) or not (str(self.interval_list[self.interval])+'SP1' in l[len(l) - 1].keys())  :
+        if not (self.averageNames[self.interval]+'LATEST' in q[len(q) - 2].keys()) or not (self.averageNames[self.interval]+'BP1' in q[len(q) - 2].keys()) or not (self.averageNames[self.interval]+'SP1' in q[len(q) - 2].keys())  :
             # print("AerageLine", prefix+str(cur_ts-1)+keyword, conn_w.hmget(prefix+str(cur_ts-1)+keyword, self.averageNames[self.interval] + 'LATEST'), prefix+ str(cur_ts-self.interval_list[self.interval])+keyword, conn_w.hmget(prefix+ str(cur_ts-self.interval_list[self.interval])+keyword, 'LATEST'))
-            d = self.averageCompute(l,interval)
+            d = self.averageCompute(q,interval)
+            # start = time.perf_counter()
             conn_w.hmset(prefix + str(cur_ts) + keyword, d)
+            # end = time.perf_counter()
+            # print(end - start,',')
+            q[len(q) - 1][self.averageNames[self.interval] + 'LATEST'] = d[self.averageNames[self.interval] + 'LATEST']
+            q[len(q) - 1][self.averageNames[self.interval] + 'SP1'] = d[self.averageNames[self.interval] + 'SP1']
+            q[len(q) - 1][self.averageNames[self.interval] + 'BP1'] = d[self.averageNames[self.interval] + 'BP1']
         else:
             # print("compute")
-            last_average_latest = l[len(l) - 2][self.interval_list[self.interval]+'LATEST']
-            last_average_bp1 = l[len(l) - 2][self.interval_list[self.interval] + 'BP1']
-            last_average_sp1 = l[len(l) - 2][self.interval_list[self.interval] + 'SP1']
+            last_average_latest = q[len(q) - 2][self.averageNames[self.interval]+'LATEST']
+            last_average_bp1 = q[len(q) - 2][self.averageNames[self.interval] + 'BP1']
+            last_average_sp1 = q[len(q) - 2][self.averageNames[self.interval] + 'SP1']
             # last_average_sp1 = conn_w.hget(prefix + str(cur_ts-1) + keyword, self.averageNames[self.interval] + 'SP1')
             # last_average_bp1 = conn_w.hget(prefix + str(cur_ts-1) + keyword, self.averageNames[self.interval] + 'BP1')
-            last_first_latest = l[0]['LATEST']
-            last_first_bp1 = l[0]['BP1']
-            last_first_sp1 = l[0]['SP1']
+            # last_first_latest = l[0]['LATEST']
+            # last_first_bp1 = l[0]['BP1']
+            # last_first_sp1 = l[0]['SP1']
             # last_first_latest = conn_w.hget("MDLD:" + str(cur_ts - self.interval_list[self.interval]) + keyword,
             #                                 'LATEST')
             # last_first_sp1 = conn_w.hget("MDLD:" + str(cur_ts - self.interval_list[self.interval]) + keyword,
             #                              'SP1')
             # last_first_bp1 = conn_w.hget("MDLD:" + str(cur_ts - self.interval_list[self.interval]) + keyword,
             #                              'BP1')
-            curr_latest = l[len(l) - 1]['LATEST']
-            curr_bp1 = l[len(l) - 1]['BP1']
-            curr_sp1 = l[len(l) - 1]['SP1']
+            curr_latest = q[len(q) - 1]['LATEST']
+            curr_bp1 = q[len(q) - 1]['BP1']
+            curr_sp1 = q[len(q) - 1]['SP1']
             # curr_latest = conn_w.hget("MDLD:" + str(cur_ts) +  keyword, 'BP1')
             # curr_sp1 = conn_w.hget("MDLD:" + str(cur_ts) + keyword, 'SP1')
             # curr_bp1 = conn_w.hget("MDLD:" + str(cur_ts) + keyword, 'BP1')
-            new_average_latest = (float(last_average_latest) * self.interval_list[self.interval] - float(last_first_latest) + float(curr_latest)) / self.interval_list[self.interval]
-            new_average_sp1 = (float(last_average_sp1) * self.interval_list[self.interval] - float(last_first_sp1) + float(curr_sp1)) / \
-                              self.interval_list[self.interval]
-            new_average_bp1 = (float(last_average_bp1) * self.interval_list[self.interval] - float(last_first_bp1) + float(curr_bp1)) / \
-                              self.interval_list[self.interval]
+            new_average_latest = float(last_average_latest) * (self.interval_list[self.interval] - 1) + float(curr_latest) * 2
+            new_average_latest = new_average_latest / (self.interval_list[self.interval] + 1)
+            new_average_sp1 = (float(last_average_sp1) * (self.interval_list[self.interval] - 1) + float(curr_sp1) * 2 ) / (self.interval_list[self.interval] + 1)
+            new_average_bp1 = (float(last_average_bp1) * (self.interval_list[self.interval] - 1) + float(curr_bp1) * 2) / ( self.interval_list[self.interval] + 1)
             d = dict()
             d[self.averageNames[self.interval] + "LATEST"] = new_average_latest
             d[self.averageNames[self.interval] + "SP1"] = new_average_sp1
             d[self.averageNames[self.interval] + "BP1"] = new_average_bp1
             # c_d = conn_w.hgetall(prefix + str(cur_ts) + keyword)
+            # start = time.perf_counter()
             conn_w.hmset(prefix + str(cur_ts) + keyword, d)
-            l[len(l) - 1][self.averageNames[self.interval] + 'LATEST'] = new_average_latest
-            l[len(l) - 1][self.averageNames[self.interval] + 'SP1'] = new_average_sp1
-            l[len(1) - 1][self.averageNames[self.interval] + 'BP1'] = new_average_bp1
+            # end = time.perf_counter()
+            # print(end - start,',')
+            q[len(q) - 1][self.averageNames[self.interval] + 'LATEST'] = new_average_latest
+            q[len(q) - 1][self.averageNames[self.interval] + 'SP1'] = new_average_sp1
+            q[len(q) - 1][self.averageNames[self.interval] + 'BP1'] = new_average_bp1
 
+    def fillyesterdayqueue(self,cur_ts,keyword, interval, keyname):
+        if keyword.startswith(":F:F"):
+            return self.yester_fqueue[keyname]
+        elif keyword.startswith(':JZ:'):
+            return self.yester_squeue[keyname]
+        elif keyword.startswith(':OP:C'):
+            return self.yester_opcqueue[keyname]
+        elif keyword.startswith(':OP:P'):
+            return self.yester_oppqueue[keyname]
+        elif keyword.startswith(":A5:"):
+            return self.yester_a5queue[keyname]
+        elif keyword.startswith(':V:C'):
+            if keyword[-6:] == 'MV0000':
+                # print("yes")
+                return self.yester_vc00queue[keyname]
+            elif keyword[-6:] == 'MVN050':
+                return  self.yester_vcn5queue[keyname]
+            elif keyword[-6:] == 'MV0050':
+                return self.yester_vc05queue[keyname]
+        elif keyword.startswith(':V:P'):
+            if keyword[-6:] == 'MV0000':
+                return self.yester_vp00queue[keyname]
+            elif keyword[-6:] == 'MVN050':
+                return  self.yester_vpn5queue[keyname]
+            elif keyword[-6:] == 'MV0050':
+                return self.yester_vp05queue[keyname]
+
+    # def getUpperLower(self):
+
+
+    def operate2(self,cur_ts:int, keyword:str, interval:int, conn_w, keyname:str):
+        prefix = "MDLD:"
+        l = self.fillyesterdayqueue(cur_ts, keyword, self.interval, keyname)
+        l2 = self.fillQueue(cur_ts, keyword,self.interval,keyname)
+        # print(prefix+str(cur_ts-1)+keyword,self.averageNames[self.interval] + 'LATEST',prefix+ str(cur_ts-self.interval_list[self.interval])+keyword)
+        last_average_latest = l[self.averageNames[self.interval] + 'LATEST']
+        last_average_bp1 = l[self.averageNames[self.interval] + 'BP1']
+        last_average_sp1 = l[self.averageNames[self.interval] + 'SP1']
+        # last_average_sp1 = conn_w.hget(prefix + str(cur_ts-1) + keyword, self.averageNames[self.interval] + 'SP1')
+        # last_average_bp1 = conn_w.hget(prefix + str(cur_ts-1) + keyword, self.averageNames[self.interval] + 'BP1')
+        # last_first_latest = l[0]['LATEST']
+        # last_first_bp1 = l[0]['BP1']
+        # last_first_sp1 = l[0]['SP1']
+        # last_first_latest = conn_w.hget("MDLD:" + str(cur_ts - self.interval_list[self.interval]) + keyword,
+        #                                 'LATEST')
+        # last_first_sp1 = conn_w.hget("MDLD:" + str(cur_ts - self.interval_list[self.interval]) + keyword,
+        #                              'SP1')
+        # last_first_bp1 = conn_w.hget("MDLD:" + str(cur_ts - self.interval_list[self.interval]) + keyword,
+        #                              'BP1')
+        curr_latest = l2[len(l2) - 1]['LATEST']
+        curr_bp1 = l2[len(l2) - 1]['BP1']
+        curr_sp1 = l2[len(l2) - 1]['SP1']
+        # curr_latest = conn_w.hget("MDLD:" + str(cur_ts) +  keyword, 'BP1')
+        # curr_sp1 = conn_w.hget("MDLD:" + str(cur_ts) + keyword, 'SP1')
+        # curr_bp1 = conn_w.hget("MDLD:" + str(cur_ts) + keyword, 'BP1')
+        print(last_average_latest,curr_latest)
+        new_average_latest = float(last_average_latest) * (self.interval_list[self.interval] - 1) + float(curr_latest) * 2
+        new_average_latest = new_average_latest / (self.interval_list[self.interval] + 1)
+        new_average_sp1 = (float(last_average_sp1) * (self.interval_list[self.interval] - 1) + float(curr_sp1) * 2) / (
+                    self.interval_list[self.interval] + 1)
+        new_average_bp1 = (float(last_average_bp1) * (self.interval_list[self.interval] - 1) + float(curr_bp1) * 2) / (
+                    self.interval_list[self.interval] + 1)
+        d = dict()
+        d[self.averageNames[self.interval] + "LATEST"] = new_average_latest
+        d[self.averageNames[self.interval] + "SP1"] = new_average_sp1
+        d[self.averageNames[self.interval] + "BP1"] = new_average_bp1
+        # c_d = conn_w.hgetall(prefix + str(cur_ts) + keyword)
+        # start = time.perf_counter()
+        conn_w.hmset(prefix + str(cur_ts) + keyword, d)
+        # end = time.perf_counter()
+        # print(end - start,',')
+        l[self.averageNames[self.interval] + 'LATEST'] = new_average_latest
+        l[self.averageNames[self.interval] + 'SP1'] = new_average_sp1
+        l[self.averageNames[self.interval] + 'BP1'] = new_average_bp1
+        pass
+
+    def initalYesData(self,conn_r,last_second:int):
+        prefix = "MDLD:"
+        last_sec = last_second
+        ifbreak = False
+        for key in self.config.config_flist.values():
+            d = dict()
+            d[self.averageNames[self.interval] + "LATEST"], d[self.averageNames[self.interval] + "BP1"], d[self.averageNames[self.interval] + "SP1"] = conn_r.hmget(prefix + str(last_sec) + ':F:F' + key, self.averageNames[self.interval] + 'LATEST',self.averageNames[self.interval] + "BP1",self.averageNames[self.interval] + "SP1")
+            self.yester_fqueue[key] = d
+            if d[self.averageNames[self.interval] + "LATEST"] == None or d[self.averageNames[self.interval] + "SP1"] == None or d[self.averageNames[self.interval] + "BP1"] == None:
+                ifbreak = True
+                break
+        if ifbreak:
+            self.finitialYest = False
+        else:
+            self.finitialYest = True
+        ifbreak = False
+        for key in self.config.config_slist:
+            d = dict()
+            d[self.averageNames[self.interval] + "LATEST"], d[self.averageNames[self.interval] + "BP1"], d[self.averageNames[self.interval] + "SP1"] = conn_r.hmget(prefix + str(last_sec) + ":JZ:" + key, self.averageNames[self.interval] + 'LATEST',self.averageNames[self.interval] + "BP1",self.averageNames[self.interval] + "SP1")
+            self.yester_squeue[key] = d
+            if d[self.averageNames[self.interval] + "LATEST"] == None or d[self.averageNames[self.interval] + "SP1"] == None or d[self.averageNames[self.interval] + "BP1"] == None:
+                ifbreak = True
+                break
+        if ifbreak:
+            self.sinitialYest = False
+        else:
+            self.sinitialYest = True
+        ifbreak = False
+        for key in self.config.config_optlist.items():
+            d = dict()
+            d[self.averageNames[self.interval] + "LATEST"], d[self.averageNames[self.interval] + "BP1"], d[self.averageNames[self.interval] + "SP1"] = conn_r.hmget(prefix + str(last_sec) + ":OP:C" + key[0], self.averageNames[self.interval] + 'LATEST',self.averageNames[self.interval] + "BP1",self.averageNames[self.interval] + "SP1")
+            self.yester_opcqueue[key[0]] = d
+            if d[self.averageNames[self.interval] + "LATEST"] == None or d[self.averageNames[self.interval] + "SP1"] == None or d[self.averageNames[self.interval] + "BP1"] == None:
+                ifbreak = True
+                break
+        if ifbreak:
+            self.opcinitialYest = False
+        else:
+            self.opcinitialYest = True
+        ifbreak = False
+        for key in self.config.config_optlist.items():
+            d = dict()
+            d[self.averageNames[self.interval] + "LATEST"], d[self.averageNames[self.interval] + "BP1"], d[self.averageNames[self.interval] + "SP1"] = conn_r.hmget(prefix + str(last_sec) + ":OP:P" + key[0], self.averageNames[self.interval] + 'LATEST',self.averageNames[self.interval] + "BP1",self.averageNames[self.interval] + "SP1")
+            self.yester_oppqueue[key[0]] = d
+            if d[self.averageNames[self.interval] + "LATEST"] == None or d[self.averageNames[self.interval] + "SP1"] == None or d[self.averageNames[self.interval] + "BP1"] == None:
+                ifbreak = True
+                break
+        if ifbreak:
+            self.oppinitialYest = False
+        else:
+            self.oppinitialYest = True
+        ifbreak = False
+        for key in self.config.config_optlist.keys():
+            d = dict()
+            d[self.averageNames[self.interval] + "LATEST"], d[self.averageNames[self.interval] + "BP1"], d[self.averageNames[self.interval] + "SP1"] = conn_r.hmget(prefix + str(last_sec)+":V:C" + key[:4]+'MV0000', self.averageNames[self.interval] + 'LATEST',self.averageNames[self.interval] + "BP1",self.averageNames[self.interval] + "SP1")
+            self.yester_vc00queue[key[:4]] = d
+            if d[self.averageNames[self.interval] + "LATEST"] == None or d[self.averageNames[self.interval] + "SP1"] == None or d[self.averageNames[self.interval] + "BP1"] == None:
+                ifbreak = True
+                break
+        if ifbreak:
+            self.vc00initialYest = False
+        else:
+            self.vc00initialYest = True
+        ifbreak = False
+        for key in self.config.config_optlist.keys():
+            # print(len(self.vcn5queue[key[:4]]))
+            d = dict()
+            d[self.averageNames[self.interval] + "LATEST"], d[self.averageNames[self.interval] + "BP1"], d[self.averageNames[self.interval] + "SP1"] = conn_r.hmget(prefix + str(last_sec)+":V:P" + key[:4] + "MV0000", self.averageNames[self.interval] + 'LATEST',self.averageNames[self.interval] + "BP1",self.averageNames[self.interval] + "SP1")
+            self.yester_vp00queue[key[:4]] = d
+            # self.appendVQueueCN5(cur_ts,conn_w,':V:C'+key[:4]+'MVN050',key[:4])
+            if d[self.averageNames[self.interval] + "LATEST"] == None or d[self.averageNames[self.interval] + "SP1"] == None or d[self.averageNames[self.interval] + "BP1"] == None:
+                ifbreak = True
+                break
+        if ifbreak:
+            self.vp00initialYest = False
+        else:
+            self.vp00initialYest = True
+        ifbreak = False
+        for key in self.config.config_optlist.keys():
+            # print(len(self.vcn5queue[key[:4]]))
+            d = dict()
+            d[self.averageNames[self.interval] + "LATEST"], d[self.averageNames[self.interval] + "BP1"], d[self.averageNames[self.interval] + "SP1"] = conn_r.hmget(prefix + str(last_sec)+":V:C" + key[:4] + "MVN050", self.averageNames[self.interval] + 'LATEST',self.averageNames[self.interval] + "BP1",self.averageNames[self.interval] + "SP1")
+            self.yester_vcn5queue[key[:4]] = d
+            if d[self.averageNames[self.interval] + "LATEST"] == None or d[self.averageNames[self.interval] + "SP1"] == None or d[self.averageNames[self.interval] + "BP1"] == None:
+                ifbreak = True
+                break
+        if ifbreak:
+            self.vcn5initialYest = False
+        else:
+            self.vcn5initialYest = True
+        ifbreak = False
+        for key in self.config.config_optlist.keys():
+            # print(len(self.vpn5queue[key[:4]]))
+            d = dict()
+            d[self.averageNames[self.interval] + "LATEST"], d[self.averageNames[self.interval] + "BP1"], d[self.averageNames[self.interval] + "SP1"] = conn_r.hmget(prefix + str(last_sec)+":V:P" + key[:4] + "MVN050", self.averageNames[self.interval] + 'LATEST',self.averageNames[self.interval] + "BP1",self.averageNames[self.interval] + "SP1")
+            self.yester_vpn5queue[key[:4]] = d
+            if d[self.averageNames[self.interval] + "LATEST"] == None or d[self.averageNames[self.interval] + "SP1"] == None or d[self.averageNames[self.interval] + "BP1"] == None:
+                ifbreak = True
+                break
+        if ifbreak:
+            self.vpn5initialYest = False
+        else:
+            self.vpn5initialYest = True
+        ifbreak = False
+        for key in self.config.config_optlist.keys():
+            # print(len(self.vc05queue[key[:4]]))
+            d = dict()
+            d[self.averageNames[self.interval] + "LATEST"], d[self.averageNames[self.interval] + "BP1"], d[self.averageNames[self.interval] + "SP1"] = conn_r.hmget(prefix + str(last_sec)+":V:C" + key[:4] + "MV0050", self.averageNames[self.interval] + 'LATEST',self.averageNames[self.interval] + "BP1",self.averageNames[self.interval] + "SP1")
+            self.yester_vc05queue[key[:4]] = d
+            if d[self.averageNames[self.interval] + "LATEST"] == None or d[self.averageNames[self.interval] + "SP1"] == None or d[self.averageNames[self.interval] + "BP1"] == None:
+                ifbreak = True
+                break
+        if ifbreak:
+            self.vc05initialYest = False
+        else:
+            self.vc05initialYest = True
+        ifbreak = False
+        for key in self.config.config_optlist.keys():
+            d = dict()
+            d[self.averageNames[self.interval] + "LATEST"], d[self.averageNames[self.interval] + "BP1"], d[self.averageNames[self.interval] + "SP1"] = conn_r.hmget(prefix + str(last_sec) + ":V:P" + key[:4] + "MV0050", self.averageNames[self.interval] + 'LATEST',self.averageNames[self.interval] + "BP1",self.averageNames[self.interval] + "SP1")
+            self.yester_vp05queue[key[:4]] = d
+            if d[self.averageNames[self.interval] + "LATEST"] == None or d[self.averageNames[self.interval] + "SP1"] == None or d[self.averageNames[self.interval] + "BP1"] == None:
+                ifbreak = True
+                break
+        if ifbreak:
+            self.vp00initialYest = False
+        else:
+            self.vp00initialYest = True
+        ifbreak = False
+        for pxname, (icode_c, icode_p) in self.config.config_optlist.items():
+            d = dict()
+            d[self.averageNames[self.interval] + "LATEST"], d[self.averageNames[self.interval] + "BP1"], d[self.averageNames[self.interval] + "SP1"] = conn_r.hmget(prefix + str(last_sec) + ":A5:" + pxname, self.averageNames[self.interval] + 'LATEST',self.averageNames[self.interval] + "BP1",self.averageNames[self.interval] + "SP1")
+            self.yester_a5queue[pxname] = d
+            if d[self.averageNames[self.interval] + "LATEST"] == None or d[self.averageNames[self.interval] + "SP1"] == None or d[self.averageNames[self.interval] + "BP1"] == None:
+                ifbreak
+                break
+        if ifbreak:
+            self.a5initialYest = False
+        else:
+            self.a5initialYest = True
+        self.initialYest = True
+
+    @timeit
     def run(self,key:int,conn_w):
         cur_ts = key  # 秒编号
         prefix = "MDLD:" + str(cur_ts)
+        p = conn_w.pipeline(transaction=False)
         for key in self.config.config_flist.values():
-            # print(len(self.fqueue[key]))
-            if len(self.fqueue[key]) < self.interval_list[self.interval]:
-                # print(len(self.fqueue[key]), self.interval_list[self.interval],
-                #       (len(self.fqueue[key]) < self.interval_list[self.interval]))
-                # self.appendFQueue(cur_ts,conn_w,':F:F'+key,key)
+            if self.finitialYest and len(self.fqueue[key]) > 0:
+                self.operate2(cur_ts,":F:F"+key,self.interval, p, keyname=key)
+            elif len(self.fqueue[key]) == self.interval_list[self.interval]:
+                self.operate(cur_ts,":F:F"+key,self.interval, p, keyname=key)
+            else:
                 continue
-            # print('hhhh')
-            # self.appendFQueue(cur_ts,conn_w,":F:F"+key,key)
-            self.operate(cur_ts,":F:F"+key,self.interval, conn_w, keyname=key)
         for key in self.config.config_slist:
-            # print(len(self.squeue[key]))
-            if len(self.squeue[key]) < self.interval_list[self.interval]:
-                # self.appendSQueue(cur_ts,conn_w,':JZ:'+key, key)
+            if self.sinitialYest and len(self.squeue[key]) > 0:
+                self.operate2(cur_ts,':JZ:'+key,self.interval, p, keyname=key)
+            elif len(self.squeue[key]) == self.interval_list[self.interval]:
+                self.operate(cur_ts,':JZ:'+key,self.interval, p, keyname=key)
+            else:
                 continue
-            # self.appendSQueue(cur_ts,conn_w,':JZ:'+key,key)
-            self.operate(cur_ts,':JZ:'+key,self.interval, conn_w, keyname=key)
         for key in self.config.config_optlist.items():
-            # print(len(self.opcqueue[key[0]]))
-            if len(self.opcqueue[key[0]]) < self.interval_list[self.interval]:
-                # self.appendOPcQueue(cur_ts, conn_w, ':OP:C' + key[0], key[0])
+            if self.opcinitialYest and len(self.opcqueue[key[0]]) > 0:
+                self.operate2(cur_ts,':OP:C'+key[0],self.interval, p, keyname=key[0])
+            elif len(self.opcqueue[key[0]]) == self.interval_list[self.interval]:
+                self.operate(cur_ts,':OP:C'+key[0],self.interval, p, keyname=key[0])
+            else:
                 continue
-            # self.appendOPcQueue(cur_ts,conn_w,':OP:C'+key[0],key[0])
-            self.operate(cur_ts,':OP:C'+key[0],self.interval,conn_w, keyname=key[0])
         for key in self.config.config_optlist.items():
             # print(len(self.oppqueue[key[0]]))
-            if len(self.opcqueue[key[0]]) < self.interval_list[self.interval]:
-                # self.appendOPpQueue(cur_ts,conn_w,':OP:P'+ key[0],key[0])
-                continue
+            # self.appendOPpQueue(cur_ts,conn_w,':OP:P'+ key[0],key[0])
+            if self.oppinitialYest and len(self.oppqueue[key[0]]) > 0:
+                self.operate2(cur_ts,':OP:P'+key[0],self.interval, p,keyname=key[0])
             # self.appendOPpQueue(cur_ts, conn_w, ':OP:P' + key[0], key[0])
-            self.operate(cur_ts,':OP:P'+key[0],self.interval,conn_w,keyname=key[0])
+            elif len(self.oppqueue[key[0]]) == self.interval_list[self.interval]:
+                self.operate(cur_ts,':OP:P'+key[0],self.interval, p,keyname=key[0])
+            else:
+                continue
         for key in self.config.config_optlist.keys():
             # print(len(self.vc00queue[key[:4]]))
-            if len(self.vc00queue[key[:4]]) < self.interval_list[self.interval]:
                 # self.appendVQueueC00(cur_ts,conn_w,':V:C'+key[:4]+'MV0000', key[:4])
+            if self.vc00initialYest and len(self.vc00queue[key[:4]]) > 0:
+                    self.operate2(cur_ts,':V:C'+key[:4]+'MV0000',self.interval, p, keyname=key[:4])
+            elif len(self.vc00queue[key[:4]]) == self.interval_list[self.interval]:
+                self.operate(cur_ts,':V:C'+key[:4]+'MV0000',self.interval, p, keyname=key[:4])
+            else:
                 continue
-            # self.appendVQueueC00(cur_ts,conn_w,':V:C'+key[:4]+'MV0000',key[:4])
-            self.operate(cur_ts,':V:C'+key[:4]+'MV0000',self.interval, conn_w, keyname=key[:4])
         for key in self.config.config_optlist.keys():
             # print(len(self.vp00queue[key[:4]]))
-            if len(self.vp00queue[key[:4]]) < self.interval_list[self.interval]:
-                # self.appendVQueueP00(cur_ts, conn_w, ':V:P' + key[:4] + 'MV0000', key[:4])
-                continue
+            if self.vp00initialYest and len(self.vp00queue[key[:4]]) > 0:
+                self.operate2(cur_ts,':V:P'+key[:4]+'MV0000',self.interval, p, keyname=key[:4])
             # self.appendVQueueP00(cur_ts,conn_w,':V:P'+key[:4]+'MV0000',key[:4])
-            self.operate(cur_ts,':V:P'+key[:4]+'MV0000',self.interval, conn_w, keyname=key[:4])
-        for key in self.config.config_optlist.keys():
-            # print(len(self.vcn5queue[key[:4]]))
-            if len(self.vcn5queue[key[:4]]) < self.interval_list[self.interval]:
-                # self.appendVQueueCN5(cur_ts, conn_w, ':V:C' + key[:4] + 'MVN050', key[:4])
+            elif len(self.vp00queue[key[:4]]) == self.interval_list[self.interval]:
+                self.operate(cur_ts,':V:P'+key[:4]+'MV0000',self.interval, p, keyname=key[:4])
+            else:
                 continue
-            # self.appendVQueueCN5(cur_ts,conn_w,':V:C'+key[:4]+'MVN050',key[:4])
-            self.operate(cur_ts,':V:C'+key[:4]+'MVN050',self.interval, conn_w, keyname=key[:4])
+        for key in self.config.config_optlist.keys():
+            if self.vcn5initialYest and len(self.vcn5queue[key[:4]]) > 0:
+                    self.operate2(cur_ts,':V:C'+key[:4]+'MVN050',self.interval, p, keyname=key[:4])
+            elif len(self.vcn5queue[key[:4]]) == self.interval_list[self.interval]:
+                self.operate(cur_ts,':V:C'+key[:4]+'MVN050',self.interval, p, keyname=key[:4])
+            else:
+                continue
 
         for key in self.config.config_optlist.keys():
-            # print(len(self.vpn5queue[key[:4]]))
-            if len(self.vpn5queue[key[:4]]) < self.interval_list[self.interval]:
-                # self.appendVQueuePN5(cur_ts, conn_w, ':V:P' + key[:4] + 'MVN050', key[:4])
-                continue
+            if self.vpn5initialYest and len(self.vpn5queue[key[:4]]) > 0:
+                self.operate2(cur_ts,':V:P'+key[:4]+'MVN050',self.interval, p, keyname=key[:4])
             # self.appendVQueuePN5(cur_ts,conn_w,':V:P'+key[:4]+'MVN050',key[:4])
-            self.operate(cur_ts,':V:P'+key[:4]+'MVN050',self.interval, conn_w, keyname=key[:4])
+            elif len(self.vpn5queue[key[:4]]) == self.interval_list[self.interval]:
+                self.operate(cur_ts,':V:P'+key[:4]+'MVN050',self.interval, p, keyname=key[:4])
+            else:
+                continue
 
         for key in self.config.config_optlist.keys():
-            # print(len(self.vc05queue[key[:4]]))
-            if len(self.vc05queue[key[:4]]) < self.interval_list[self.interval]:
-                # self.appendVQueueC05(cur_ts, conn_w, ':V:C' + key[:4] + 'MV0050', key[:4])
+            if self.vc05initialYest and len(self.vc05queue[key[:4]]) > 0:
+                self.operate2(cur_ts,':V:C'+key[:4]+'MV0050',self.interval, p, keyname=key[:4])
+            elif len(self.vc05queue[key[:4]]) == self.interval_list[self.interval]:
+                self.operate(cur_ts,':V:C'+key[:4]+'MV0050',self.interval, p, keyname=key[:4])
+            else:
                 continue
-            # self.appendVQueueC05(cur_ts,conn_w,':V:C'+key[:4]+'MV0050',key[:4])
-            self.operate(cur_ts,':V:C'+key[:4]+'MV0050',self.interval, conn_w, keyname=key[:4])
 
         for key in self.config.config_optlist.keys():
-            if len(self.vp05queue[key[:4]]) < self.interval_list[self.interval]:
-                # self.appendVQueueP05(cur_ts, conn_w, ':V:P' + key[:4] + 'MV0050', key[:4])
+            if self.vp05initialYest and len(self.vp05queue[key[:4]]) > 0:
+                self.operate2(cur_ts,':V:P'+key[:4]+'MV0050',self.interval, p, keyname=key[:4])
+            elif len(self.vp05queue[key[:4]]) == self.interval_list[self.interval]:
+                self.operate(cur_ts,':V:P'+key[:4]+'MV0050',self.interval, p, keyname=key[:4])
+            else:
                 continue
-            # self.appendVQueueP05(cur_ts,conn_w,':V:P'+key[:4]+'MV0050',key[:4])
-            self.operate(cur_ts,':V:P'+key[:4]+'MV0050',self.interval, conn_w, keyname=key[:4])
+        for pxname, (icode_c, icode_p) in self.config.config_optlist.items():
+            if self.a5initialYest and len(self.a5queue[pxname]) > 0:
+                self.operate2(cur_ts,":A5:"+ pxname,self.interval,p,keyname=pxname)
+            elif len(self.a5queue[pxname]) == self.interval_list[self.interval]:
+                self.operate(cur_ts,":A5:"+ pxname, self.interval, p, keyname=pxname)
+            else:
+                continue
+
+        p.execute()
