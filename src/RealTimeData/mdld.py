@@ -62,15 +62,31 @@ def second(key:str):
     print("It is " + str(key),time.time(),time.localtime())
 
 
-class PeriodAPP():
-    def __init__(self, firstrange:list, secondrange: list):
-        self.currentDate = str(time.localtime().tm_year) + "-" + str(time.localtime().tm_mon) + "-" + str(time.localtime().tm_mday) #> "2019-07-11"
+def timeit(func):
+    def test(self):
+        start = time.perf_counter()
+        func(self)
+        end = time.perf_counter()
+        print("period time used: ", end - start)
+    return test
 
-        self.f_starttime = time.mktime(time.strptime(self.currentDate + " " + firstrange[0] , "%Y-%m-%d %H:%M:%S"))    # >  1563785375.0012558
-        self.f_endtime = time.mktime(time.strptime(self.currentDate + " " + firstrange[1] , "%Y-%m-%d %H:%M:%S"))      # >  1563785475.0012558
-        self.s_starttime = time.mktime(time.strptime(self.currentDate + " " + secondrange[0] , "%Y-%m-%d %H:%M:%S"))   # >  1563785575.0012558
-        self.s_endtime = time.mktime(time.strptime(self.currentDate + " " + secondrange[1] , "%Y-%m-%d %H:%M:%S"))     # >  1563785675.0012558
 
+def mysleep(t:float):
+    if t > 0:
+        time.sleep(t)
+
+
+class PeriodAPP:
+    def __init__(self, firstrange:list, secondrange:list):
+        """
+        :param firstrange:  ['09:30:00', '11:30:00']
+        :param secondrange:  ['13:00:00', '15:00:00']
+        """
+        self.currentDate = str(time.localtime().tm_year) + "-" + str(time.localtime().tm_mon) + "-" + str(time.localtime().tm_mday)  #> "2019-07-11"
+        self.f_starttime = time.mktime(time.strptime(self.currentDate + " " + firstrange[0] , "%Y-%m-%d %H:%M:%S"))    #>  1563785375.0012558
+        self.f_endtime = time.mktime(time.strptime(self.currentDate + " " + firstrange[1] , "%Y-%m-%d %H:%M:%S"))      #>  1563785475.0012558
+        self.s_starttime = time.mktime(time.strptime(self.currentDate + " " + secondrange[0] , "%Y-%m-%d %H:%M:%S"))   #>  1563785575.0012558
+        self.s_endtime = time.mktime(time.strptime(self.currentDate + " " + secondrange[1] , "%Y-%m-%d %H:%M:%S"))     #>  1563785675.0012558
         self.config = Config("redis_mdld.yaml")
         # self.a5s = AverageLine(0)
         # self.a10s = AverageLine(1)
@@ -87,19 +103,11 @@ class PeriodAPP():
         # self.a4h = AverageLine(12)
         # self.a1d = AverageLine(13)
         self.conn_r = redis.Redis(host="168.36.1.115", port=6379, password="", charset='gb18030', errors='replace',
-                           decode_responses=True)
+                                  decode_responses=True)
         self.conn_w = redis.Redis(host="168.36.1.116", port = 6379, password="", charset='gb18030',errors="replace",
-                             decode_responses=True)
+                                  decode_responses=True)
         self.conn_r2 = redis.Redis(host="168.36.1.170", port=6379, password="", charset='gb18030', errors='replace',
-                           decode_responses=True)
-
-    def timeit(func):
-        def test(self):
-            start = time.perf_counter()
-            func(self)
-            end = time.perf_counter()
-            print("period time used: ", end - start)
-        return test
+                                   decode_responses=True)
 
     def vcompute(self, xingquan_list:list, time:str, pe:int, cur_ts:int, j:int, conn_w):
         # print(p_run[j])
@@ -118,7 +126,7 @@ class PeriodAPP():
 
         i = 0
         while i < len(xingquan_list):
-            if  pe < xingquan_list[i]['XingQuan']:
+            if pe < xingquan_list[i]['XingQuan']:
                 # print(p_runj,xingquan_list[i]['XingQuan'])
                 pre_c_p = 1.0 * (float(xingquan_list[i - 1]['C_Latest']) - float(xingquan_list[i]['C_Latest'])) / (
                                float(xingquan_list[i]['XingQuan']) - float(xingquan_list[i-1]['XingQuan'])) * (
@@ -262,14 +270,13 @@ class PeriodAPP():
 
         pre = 'KZ:'
         pre1 = 'KZ:JZ0000KZE'
-
         for key in self.config.config_slist:
             conn_r.mget([pre + key + ":LATEST", pre+key + ":BP1", pre + key + ":SP1"])
-            conn_r.mget([pre1 + key[1:] +":NEW", pre1 + key[1:] + ":B1", pre1 + key[1:] + ":S1"])
+            conn_r.mget([pre1 + key[1:] + ":NEW", pre1 + key[1:] + ":B1", pre1 + key[1:] + ":S1"])
         conn_r2 = self.conn_r2.pipeline(transaction=False)
         # print("期权列表")
-        op_c_p_price = list()
-        date_list = set()
+        # op_c_p_price = list()
+        # date_list = set()
         for pxname, (icode_c, icode_p)in self.config.config_optlist.items():
             #> '1909M02750': ['10001709', '10001710']
             # print(item[0][:4])
@@ -303,8 +310,7 @@ class PeriodAPP():
             # self.a4h.fqueue[key].append(d)
             f_d_list[keyname] = d
             conn_w.hmset("MDLD:" + str(cur_ts) + ":F:F" + key, d)
-        pre = 'KZ:'
-        pre1 = 'KZ:JZ0000KZE'
+
         # print("现货列表")
         pe = 0
         pe300 = 0
@@ -332,11 +338,11 @@ class PeriodAPP():
             conn_w.hmset("MDLD:" + str(cur_ts) + ":S:" + key,d)
             new, b1, s1 = r1_result[r1_index]
             r1_index = r1_index + 1
-            if new == None:
+            if new is None:
                 new = 0
-            if b1 == None:
+            if b1 is None:
                 b1 = 0
-            if s1 == None:
+            if s1 is None:
                 s1 = 0
             d2 = dict()
             d2['LATEST'] = new
@@ -381,7 +387,7 @@ class PeriodAPP():
         op_c_p_price = list()
         date_list = set()
         r2_index = 0
-        for pxname, (icode_c, icode_p)in self.config.config_optlist.items():
+        for pxname, _ in self.config.config_optlist.items():
             #> '1909M02750': ['10001709', '10001710']
             # print(item[0][:4])
             date_list.add(pxname[:4])  #> “1909”
@@ -392,15 +398,15 @@ class PeriodAPP():
             tem2['Latest'], tem2['SP1'], tem2['BP1'], tem2['PreSettle'] = r2_result[r2_index]
             r2_index = r2_index + 1
             # print(tem1, tem2)
-            if tem1['Latest'] == None or tem1['BP1'] == None or tem1['SP1'] == None or tem2['Latest'] == None \
-                    or tem2['SP1'] == None or tem2['BP1'] == None or tem1['PreSettle'] == None or tem2['PreSettle'] == None:
+            if tem1['Latest'] is None or tem1['BP1'] is None or tem1['SP1'] is None or tem2['Latest'] is None \
+                    or tem2['SP1'] is None or tem2['BP1'] is None or tem1['PreSettle'] is None or tem2['PreSettle'] is None:
                 continue
             if tem1['Latest'] == 0:
                 tem1['Latest'] = tem1['PreSettle']
             if tem2['Latest'] == 0:
                 tem2['Latest'] = tem2['PreSettle']
             # print(tem1)
-            price_dict= dict()
+            price_dict = dict()
             price_dict['Name'] = pxname
             price_dict['XingQuan'] = int(pxname[-5:]) * 10  #> "02750"
             price_dict['C_Latest'] = tem1['Latest']
@@ -412,7 +418,7 @@ class PeriodAPP():
             op_c_p_price.append(price_dict)
             # print(tem1)
             # print(tem2)
-            if tem1['Latest'] != None and tem1['BP1'] != None and tem1['SP1'] != None:
+            if tem1['Latest'] is not None and tem1['BP1'] is not None and tem1['SP1'] is not None:
                 td = {"LATEST": tem1['Latest'], 'BP1': tem1['BP1'], 'SP1': tem1['SP1']}
                 conn_w.hmset("MDLD:" + str(cur_ts) + ":OP:" + "C" + pxname, td)
 
@@ -429,7 +435,7 @@ class PeriodAPP():
                 # self.a1h.opcqueue[pxname].append(td)
                 # self.a2h.opcqueue[pxname].append(td)
                 # self.a4h.opcqueue[pxname].append(td)
-            if tem2['Latest'] != None and tem2['SP1'] != None and tem2['BP1'] != None:
+            if tem2['Latest'] is not None and tem2['SP1'] is not None and tem2['BP1'] is not None:
                 td = {"LATEST":tem2['Latest'],'BP1':tem2['BP1'],'SP1':tem2['SP1']}
                 conn_w.hmset("MDLD:" + str(cur_ts) + ":OP:" + "P" + pxname, td)
                 # self.a5s.oppqueue[pxname].append(td)
@@ -476,7 +482,7 @@ class PeriodAPP():
             # self.a4h.a5queue[pxname].append(d)
             conn_w.hmset("MDLD:" + str(cur_ts) + ":A5:" + pxname,d)
             conn_w.set("MDLD:" + str(cur_ts) + ":PO:" + pxname,po)
-        for key in self.config.config_flist.keys():
+        for key in self.config.config_flist:
             d = dict()
             if key.startswith("IH"):
                 d["B"] = int(f_d_list[key]['BP1'])//1000 - pe_510050_SP1
@@ -507,7 +513,7 @@ class PeriodAPP():
         #             op_c_p_price[t+1] = temp_d
         #         t = t+1
         # print(op_c_p_price)
-        op_c_p_price = sorted(op_c_p_price,key = lambda x: x['XingQuan'])
+        op_c_p_price = sorted(op_c_p_price, key=lambda x: x['XingQuan'])
         # print(op_c_p_price)
         date_list = list(date_list)
         date_list.sort()  #> ['1908', '1909', '1912', '2003']
@@ -515,24 +521,24 @@ class PeriodAPP():
         xiayue_c_p_price = list()
         xiaji_c_p_price = list()
         geji_c_p_price = list()
-        for i in range(len(op_c_p_price)):
-            if op_c_p_price[i]['Name'].startswith(date_list[0]):
-                dangyue_c_p_price.append(op_c_p_price[i])
-            elif op_c_p_price[i]['Name'].startswith(date_list[1]):
-                xiayue_c_p_price.append(op_c_p_price[i])
-            elif op_c_p_price[i]['Name'].startswith(date_list[2]):
-                xiaji_c_p_price.append(op_c_p_price[i])
-            elif op_c_p_price[i]['Name'].startswith(date_list[3]):
-                geji_c_p_price.append(op_c_p_price[i])
+        for px in op_c_p_price:
+            if px['Name'].startswith(date_list[0]):
+                dangyue_c_p_price.append(px)
+            elif px['Name'].startswith(date_list[1]):
+                xiayue_c_p_price.append(px)
+            elif px['Name'].startswith(date_list[2]):
+                xiaji_c_p_price.append(px)
+            elif px['Name'].startswith(date_list[3]):
+                geji_c_p_price.append(px)
         # print(dangyue_c_p_price)
         # print(xiayue_c_p_price)
         # print(xiaji_c_p_price)
         # print(geji_c_p_price)
-        pe_p = pe + 500
-        pe_n = pe - 500
+        pe_p = pe + 500  # positive
+        pe_n = pe - 500  # negative
         p_run = [pe_n,pe,pe_p]
         for i, p_runj in enumerate(p_run):
-            if len(dangyue_c_p_price) != 0 :
+            if len(dangyue_c_p_price) != 0:
                 self.vcompute(dangyue_c_p_price, dangyue_c_p_price[0]['Name'][:4],p_runj,cur_ts,i,conn_w)
             if len(xiayue_c_p_price) != 0:
                 self.vcompute(xiayue_c_p_price, xiayue_c_p_price[0]['Name'][:4],p_runj,cur_ts,i,conn_w)
@@ -561,61 +567,49 @@ class PeriodAPP():
     def start(self):
         print("上班啦")
         print("上午：")
-        self.operate([self.f_starttime,self.f_endtime],57600)
+        self.operate(self.f_starttime,self.f_endtime)
         print("下午：")
-        self.operate([self.s_starttime,self.s_endtime],45000)
+        self.operate(self.s_starttime,self.s_endtime)
         print("下班啦")
 
-    def operate(self, interval:list, last_sec:int):
-
-        start_time = interval[0]
-        end_time = interval[1]
+    def operate(self, start_time:int, end_time:int):
+        """
+        :param start_time: '09:30:00'
+        :param end_time: '11:30:00'
+        :return: 
+        """""
         if time.time() > end_time:
             return
         ctime = time.time()
         if ctime < start_time:
             print("等待开盘")
-            conn_w = self.conn_w
-            # self.a5s.initalYesData(conn_w,last_sec)
-            # self.a10s.initalYesData(conn_w,last_sec)
-            # self.a15s.initalYesData(conn_w,last_sec)
-            # self.a30s.initalYesData(conn_w,last_sec)
-            # self.a1m.initalYesData(conn_w,last_sec)
-            # self.a3m.initalYesData(conn_w,last_sec)
-            # self.a5m.initalYesData(conn_w,last_sec)
-            # self.a10m.initalYesData(conn_w,last_sec)
-            # self.a15m.initalYesData(conn_w,last_sec)
-            # self.a30m.initalYesData(conn_w,last_sec)
-            # self.a1h.initalYesData(conn_w,last_sec)
-            # self.a2h.initalYesData(conn_w,last_sec)
-            # self.a4h.initalYesData(conn_w,last_sec)
-            # self.a1d.initalYesData(conn_w,last_sec)
             interval = int(start_time) - time.time()
             if interval > 0:
                 time.sleep(interval)
             self.run()
 
-        ctime = time.time()
-        if ctime >= start_time and ctime <= end_time:
-            time.sleep(int(time.time())+1 - time.time())
+        ctime = time.time()  #type: float
+        if start_time <= ctime <= end_time:
+            # 9:30:01:001
+            mysleep(int(ctime)+1 - time.time())
             while time.time() < end_time:
                 self.run()
                 time1 = time.time()
                 time.sleep(int(time.time())+1 - time.time())
                 if int(time.time()) - int(time1) != 1:
-                    print("miss one")
+                    raise(Exception("miss one"))
             self.run()
-
 
 
 def main():
     # print(type(time.localtime().tm_mon),time.localtime().tm_year,time.localtime().tm_mday)
-    t = PeriodAPP(["09:30:00","11:30:00"],["13:00:00","15:00:00"])
+    t = PeriodAPP(["09:30:00", "11:30:00"], ["13:00:00", "15:00:00"])
     t.start()
     # time.sleep(10)
     # t.join()
     # print(5)
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
     main()
 
