@@ -1,0 +1,43 @@
+
+local:
+  matic_account_ids: ["32013309", "32013370", "88000032013309_OPT", "900010259_RZRQ"]
+  server_rdpub: local
+  server_md: 170
+  server_td: local
+  server_tde: local
+  server_tdf: local
+  server_insight: 173b
+  icon: debug.ico
+
+
+fy01:
+  matic_account_ids: ["666800003362", "900280001199_RZRQ"]
+  server_rdpub: 170
+  server_md: 170
+  server_td: 172
+  server_tde: 124
+  server_tdf: 178
+  server_insight: 173b
+  icon: fy01.ico
+
+
+fy02:
+  matic_account_ids: ["666800011705", "906100001865_RZRQ"]
+  server_rdpub: 170
+  server_md: 170
+  server_td: qwin160
+  server_tde: 125
+  server_tdf: 179
+  server_insight: 173b
+  icon: fy02.ico
+
+
+frtz:
+  matic_account_ids: ["xxx"]
+  server_rdpub: 170
+  server_md: 170
+  server_td: 171
+  server_tde: 126
+  server_tdf: 177
+  server_insight: 173b
+  icon: frtz.ico

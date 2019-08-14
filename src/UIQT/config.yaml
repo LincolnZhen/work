@@ -1,0 +1,43 @@
+
+default:
+  user: yzw # 交易员
+  product: fy02 # 产品标识，默认为空(fy01)
+
+  am: M # A=只做A合约 M=只做非A合约 .=所有合约
+
+  verbose: 1
+  debug: 1
+  fake: 0
+  poll_interval: 2
+
+order_multi_free:
+  id: multi     # 交易客户端标识
+  offset: 1     # 0=开 1=净 2=卖净
+  txc: 5 5 5 10 # 撤补参数
+
+order_single:
+  id: single    # 交易客户端标识
+  txc: 5 5 5 10 # 撤补参数
+
+order_single_f:
+  id: single_f    # 交易客户端标识
+
+order_single_matic:
+  id: matic1    # 交易客户端标识
+
+order_etfl:
+  id: etfl
+
+order_fe:
+  id: fe
+  # txc_f: 1 2000 1 6000 # 毫 2000=0.2点 挂单无须自撤补
+
+order_fop:
+  id: fop
+
+md_T:
+  txc: 1 10 2 20
+  pxdist: 3000
+
+order_single_c:
+  cflst: ["au1908", "au1909", "au1912", "cu1909", "cu1909C49000"]
