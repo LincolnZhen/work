@@ -231,7 +231,7 @@ class UpperLowControl:
             self.run()
 
     def run(self):
-        cur_ts = int(time.time())-int(time.mktime(time.strptime(self.currentDate + " " + "00:00:00" , "%Y-%m-%d %H:%M:%S"))) + 3600 - 1 # > 1563785675
+        cur_ts = int(time.time())-int(time.mktime(time.strptime(self.currentDate + " " + "00:00:00" , "%Y-%m-%d %H:%M:%S"))) + 3 * 3600 - 1 # > 1563785675
         print("当前时间：" + str(cur_ts))
         dt = self.getData(cur_ts)
         # print("run",data)

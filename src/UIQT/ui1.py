@@ -1,3 +1,4 @@
+import win32process
 from PyQt5 import QtWidgets, QtCore, QtGui
 import sys
 import redis
@@ -194,7 +195,11 @@ class MainUi(QtWidgets.QMainWindow):
 
     @pyqtSlot()
     def on_edit(self):
-        os.system('python ui.exe')
+        win32process.CreateProcess(None,"ui.exe", None, None, 0,
+                                           win32process.CREATE_NO_WINDOW,
+                                           None,
+                                           None,
+                                           win32process.STARTUPINFO())
 
     def timer_start(self):
         self.timer = QtCore.QTimer(self)

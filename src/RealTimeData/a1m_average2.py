@@ -9,3 +9,4 @@ if __name__ == '__main__':
 
     macdC = MACDControl([["09:30:01","11:30:01"],["13:00:01","15:00:01"]],60)
     macdC.start()
+    # macdC.AfterCloseStart(52200,57600,64800)

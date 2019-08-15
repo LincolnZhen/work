@@ -1,13 +1,8 @@
 from PyQt5 import QtWidgets, QtCore, QtGui
-import pyqtgraph as pg
 import sys
-import traceback
-import psutil
 import redis
-import time
 import yaml
 from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import  re
 

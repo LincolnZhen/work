@@ -145,7 +145,7 @@ class MainUi(QtWidgets.QMainWindow):
         self.plot_widget.setLayout(self.plot_layout)  # 设置K线图部件的布局层
         # self.plot_plt = pg.PlotWidget()  # 实例化一个绘图部件
         # self.plot_plt2 = pg.GraphicsWindow(title="画图")
-        self.time_axis = {37800:"09:30:00", 37800+3600: "10:30:00", 45000:"11:30:00/13:00:00", 45000+3600:"14:00:00",45000+7200:"15:00:00"}
+        self.time_axis = {45000:"09:30:00", 45000+3600: "10:30:00", 45000+7200:"11:30:00/13:00:00", 45000+7200+3600:"14:00:00",45000+7200+7200:"15:00:00"}
         self.stringaxis = pg.AxisItem(orientation='bottom')
         self.stringaxis.setTicks([self.time_axis.items()])
         self.plot_plt = pg.PlotWidget()
@@ -207,7 +207,7 @@ class MainUi(QtWidgets.QMainWindow):
             self.keyTypeName.append(":V:P"+key[:4]+'MV0050')
         for pxname, (icode_c, icode_p) in self.config.config_optlist.items():
             self.keyTypeName.append(":A5:" + pxname)
-        self.keyTypeName.append(":A5::PJ")
+        self.keyTypeName.append(":A5:PM:PJ")
         self.keyTypeName.append(":A13:IH01")
     # 启动定时器 时间间隔秒
     def timer_start(self):
@@ -229,8 +229,8 @@ class MainUi(QtWidgets.QMainWindow):
                 data = float(res[i])/ pow(10,scale) + movdis
                 # print(data)
                 time = i + starttime
-                if time >= 50400:
-                    time = time - (50400 - 45000)
+                if time >= 57600:
+                    time = time - (57600 - 52200)
                 self.time_list[index].append(time)
                 self.data_list[index].append(data)
                 self.data_time_list[index][time] = data
@@ -238,7 +238,7 @@ class MainUi(QtWidgets.QMainWindow):
     def get_info(self):
         try:
             prefix = 'MDLD:'
-            key = int(time.time()) - int(time.mktime(time.strptime(self.currentDate + " " + "00:00:00", "%Y-%m-%d %H:%M:%S"))) + 3600 - 10# > 1563785675
+            key = int(time.time()) - int(time.mktime(time.strptime(self.currentDate + " " + "00:00:00", "%Y-%m-%d %H:%M:%S"))) + 3600*3 - 10 #> 1563785675
             # time = key
             for i in range(self.nbox):
                 averageType = self.select_box_list[i][0].currentText()
@@ -265,8 +265,8 @@ class MainUi(QtWidgets.QMainWindow):
                     data = float(data) / pow(10, scale) + movdis
                     self.data_list[i].append(data)
                     t = 0
-                    if key >= 50400:
-                        t = key - (50400 - 45000)
+                    if key >= 57600:
+                        t = key - (57600 - 52200)
                         self.time_list[i].append(t)
                     else:
                         t = key
@@ -337,11 +337,11 @@ class MainUi(QtWidgets.QMainWindow):
                 continue
             d = dict()
             print
-            if index > 45000:
-                d["time"] = index + (50400 - 45000)
+            if index > 52200:
+                d["time"] = index + (57600 - 52200)
             else:
                 d['time'] = index
-            d["time"] = d["time"] + int(time.mktime(time.strptime(self.currentDate + " " + "00:00:00", "%Y-%m-%d %H:%M:%S"))) - 3600 + 10
+            d["time"] = d["time"] + int(time.mktime(time.strptime(self.currentDate + " " + "00:00:00", "%Y-%m-%d %H:%M:%S"))) - 3600 * 3 + 10
             d["time"] = str(time.localtime(d['time']).tm_hour) + ":" + str(time.localtime(d['time']).tm_min) + ":" + str(time.localtime(d['time']).tm_sec)
             d['name'] = averageType+keytypename+keyname
             d["value"] = self.data_time_list[i][index]
