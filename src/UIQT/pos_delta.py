@@ -222,7 +222,7 @@ class MainUi(QtWidgets.QMainWindow):
             cont = file.read()
             res = yaml.load(cont,Loader=yaml.FullLoader)
             # print(res)
-            server_td = res[product]["server_td"]
+            server_td = str(res[product]["server_td"])
 
         tdr = ""
         with open(serv, "rb") as file:
@@ -235,8 +235,7 @@ class MainUi(QtWidgets.QMainWindow):
         port = tdr.split(":")[1]
         db = tdr.split(":")[2]
         # print(host,port,db)
-        self.p_r = redis.Redis(host=host, port=port, password="", db=db, charset='gb18030', errors="replace",
-                                  decode_responses=True)
+        self.p_r = redis.Redis(host=host, port=port, password="", db=db, charset='gb18030', errors="replace",decode_responses=True)
 
 
     def getData(self):

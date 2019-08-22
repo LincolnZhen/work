@@ -1,7 +1,7 @@
 
 default:
   user: yzw # 交易员
-  product: fy02 # 产品标识，默认为空(fy01)
+  product: fy01 # 产品标识，默认为空(fy01)
 
   am: M # A=只做A合约 M=只做非A合约 .=所有合约
 
